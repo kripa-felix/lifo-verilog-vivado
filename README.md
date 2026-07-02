@@ -78,6 +78,11 @@ Design was synthesized and implemented in Vivado. Reports below (from the basic 
 **Power Report**
 ![Power Report](screenshots/5_power_report.png)
 
+Design was synthesized and implemented in Vivado. Reports below (from the extended testbench run):
+
+**Output Waveform (Vscode)**
+![Output Waveform](screenshots/6_output_waveform.png)
+
 ## Results
 
 - Designed and verified a 32x32 LIFO stack in Verilog
