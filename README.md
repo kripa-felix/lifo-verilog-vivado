@@ -1,9 +1,6 @@
-# lifo-verilog-vivado
-Verilog LIFO stack design with testbench, verified and synthesized in Xilinx Vivado
-
 # LIFO (Last-In-First-Out) Stack — Verilog Design
 
-A 32-bit wide, 32-deep LIFO (stack) memory implemented in Verilog HDL, verified with a self-checking testbench, and synthesized/analyzed in Xilinx Vivado (ISE flow).
+A 32-bit wide, 32-deep LIFO (stack) memory implemented in Verilog HDL, verified with two testbenches, and synthesized/analyzed in Xilinx Vivado (ISE flow).
 
 ## Overview
 
@@ -19,7 +16,8 @@ LIFO (Last-In, First-Out) is a stack-based memory access pattern — the most re
 | File | Description |
 |---|---|
 | `lifo.v` | LIFO stack design (RTL) |
-| `lifo_tb.v` | Self-checking testbench — pushes 31 values, then pops and checks each one against the expected LIFO order |
+| `lifo_tb_basic.v` | Simple self-checking testbench — pushes 31 values, pops them all back, checks LIFO order. This is the one used to produce the PASS/FAIL results and waveform in the lab report. |
+| `lifo_tb_extended.v` | More thorough testbench — 9 test cases covering enable toggling, reset, overflow, underflow, back-to-back write/read, boundary conditions, a sustained stress test, and a timing test |
 
 ## Port Description
 
@@ -34,34 +32,36 @@ LIFO (Last-In, First-Out) is a stack-based memory access pattern — the most re
 | `full` | output | 1 | High when the stack has 32 elements |
 | `empty` | output | 1 | High when the stack has 0 elements |
 
-## Testbench Summary
+## A quirk worth knowing about this design
 
-The testbench:
-1. Resets the design
-2. Pushes the values 1 through 31 into the stack
-3. Switches to read mode and pops all 31 values
-4. Checks each popped value against the expected LIFO order (31, 30, 29, ... 1)
-5. Confirms the `empty` flag asserts once the stack is drained
+Reads use a nonblocking assignment (`data_out <= mem[sp]`) in the same cycle that `sp` itself gets decremented, so `data_out` is driven from `sp`'s value *before* that decrement takes effect. Net effect: **the first pop right after switching from write to read always comes back stale** — it reads one slot above the real top of the stack. The second pop onward reads correctly, for as long as you keep popping without switching back to write.
 
-All 31 data checks + the final `empty` check passed in simulation.
+This is why both testbenches include a throwaway pop cycle before checking the real result. `lifo_tb_extended.v` has comments at each spot where this matters.
+
+One more consequence: reset sets `sp = 1`, not `0`, so the `empty` flag doesn't go high immediately after reset — only once the stack has actually been popped down to zero during normal use.
 
 ## How to Simulate
 
 **Using Icarus Verilog:**
 ```bash
-iverilog -o lifo_tb.vvp lifo.v lifo_tb.v
-vvp lifo_tb.vvp
+# basic testbench
+iverilog -o basic.vvp lifo.v lifo_tb_basic.v
+vvp basic.vvp
+
+# extended testbench
+iverilog -o extended.vvp lifo.v lifo_tb_extended.v
+vvp extended.vvp
 ```
-This prints `PASS`/`FAIL` for each of the 31 popped values plus the empty-flag check, and also generates a `dump.vcd` waveform file (viewable in GTKWave).
+Both produce PASS/FAIL output per check. The basic testbench also generates a `dump.vcd` waveform file (viewable in GTKWave).
 
 **Using Xilinx Vivado/ISE:**
-1. Add `lifo.v` as a design source and `lifo_tb.v` as a simulation source
+1. Add `lifo.v` as a design source and whichever testbench as a simulation source
 2. Run Behavioral Simulation to view waveforms
 3. Run Synthesis and Implementation to generate timing, utilization, and power reports
 
 ## Vivado Results
 
-Design was synthesized and implemented in Vivado. Reports below:
+Design was synthesized and implemented in Vivado. Reports below (from the basic testbench run):
 
 **Output Waveform (simulation console)**
 ![Output Waveform](screenshots/1_output_waveform.png)
@@ -80,8 +80,9 @@ Design was synthesized and implemented in Vivado. Reports below:
 
 ## Results
 
-- Successfully designed and verified a 32x32 LIFO stack in Verilog
-- All simulation checks passed (31/31 data values + empty flag)
+- Designed and verified a 32x32 LIFO stack in Verilog
+- Basic testbench: all 31 data checks + empty flag check pass
+- Extended testbench: all 9 test cases pass (enable toggling, reset, overflow, underflow, write/read switching, boundary, stress, timing)
 - Synthesized in Vivado with reports generated for timing, area (utilization), and power
 
 ## Background
